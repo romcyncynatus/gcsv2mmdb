@@ -1,115 +1,111 @@
 import win32com.client
 import os
 
+NON_ENG_LANGCODE = 3 # Hebrew
+
+def is_ascii(s):
+    return all(ord(c) < 128 for c in s)
+
 """
 This class implements motorola phonebook manager database.
 You may add contacts using this class.
 """
-
-class mMDB:    
-    def __init__(self,mdb_file_path):
-        if os.path.exists(mdb_file_path):
-            raise Exception, "mdb output file already exists."
-    
-        db_eng = win32com.client.gencache.EnsureDispatch("DAO.DBEngine.35")
-        self.db = db_eng.CreateDatabase(mdb_file_path, win32com.client.constants.dbLangGeneral)
+class mMDB:
+    def __init__(self,mdb_file_path,override_mdb_file=False):
+        # Set mmdb file path as class property 
+        self.mdb_file_path = mdb_file_path
         
-        # Create DB Tables
-        self.db.Execute("CREATE TABLE tblContactList (ID Integer, ContactID Integer, ContactName Text (22), SpeedDial Integer, [Number] Text (201), NumberType Integer, Language Byte, NameLang Byte, PhoneNumberLength Byte, Reserved Integer, TonNP Byte, CapabilityID Byte, ExtnRecID Byte, VoiceTag Integer, TStamp0 Byte, TStamp1 Byte, TStamp2 Byte, TStamp3 Byte, SyncStatus Integer, TempID Integer, RingerID Byte, PictureID Integer, ExtnRecIDMSB Byte)")
+        # Create mmdb engine instance
+        db_engine = win32com.client.gencache.EnsureDispatch("DAO.DBEngine.35")
         
-        self.db.Execute("CREATE TABLE tblGSMPhonebook ([Index] Integer, AliasName Text (12), PhoneNumber Text (21), Programmed Byte, Language Byte)")
-
-        self.db.Execute("CREATE TABLE tblIdentification (ID Integer, Title Text (50), SIM_Model Text (50), LastUpDate DateTime, TotalContacts Integer, TotalEntries Integer, ListSize Integer, Recognition Text (24))")
-
-        self.db.Execute("CREATE TABLE tblNumberTypes (ID Integer, TypeName Text (50), [Value] Integer)")
+        # Check whether mmdb file already exists
+        if os.path.exists(self.mdb_file_path):
+            # If asked to override, delete file and create a new mmdb
+            if override_mdb_file:
+                os.remove(self.mdb_file_path)
+                db = db_engine.CreateDatabase(mdb_file_path, win32com.client.constants.dbLangGeneral)
+                self._InitMmdb(db,True)
+            # Just open existing mmdb file
+            else:
+                db = db_engine.OpenDatabase(mdb_file_path)
+                self._InitMmdb(db,False)
+        # mmdb doesn't exists. Create a new one.
+        else:
+                db = db_engine.CreateDatabase(mdb_file_path, win32com.client.constants.dbLangGeneral)
+                self._InitMmdb(db, True)
         
-        # Insert Identification defaults
-        self.db.Execute("INSERT INTO tblIdentification VALUES (1,\"IPM\",\"\",\"09/24/03 00:00:00\",0,0,0,\"iDEN Phonebook Manager\")")
-    
-        # Insert Number types data
-        self.db.Execute("INSERT INTO tblNumberTypes VALUES (1,\"Main\",0)")
+    def _InitMmdb(self,mmdb,is_new_mmdb):
+        self.mmdb = mmdb
+        if is_new_mmdb:
+            # Create DB Tables
+            self.mmdb.Execute("CREATE TABLE tblContactList (ID Integer, ContactID Integer, ContactName Text (22), SpeedDial Integer, [Number] Text (201), NumberType Integer, Language Byte, NameLang Byte, PhoneNumberLength Byte, Reserved Integer, TonNP Byte, CapabilityID Byte, ExtnRecID Byte, VoiceTag Integer, TStamp0 Byte, TStamp1 Byte, TStamp2 Byte, TStamp3 Byte, SyncStatus Integer, TempID Integer, RingerID Byte, PictureID Integer, ExtnRecIDMSB Byte)")
+            self.mmdb.Execute("CREATE TABLE tblGSMPhonebook ([Index] Integer, AliasName Text (12), PhoneNumber Text (21), Programmed Byte, Language Byte)")
+            self.mmdb.Execute("CREATE TABLE tblIdentification (ID Integer, Title Text (50), SIM_Model Text (50), LastUpDate DateTime, TotalContacts Integer, TotalEntries Integer, ListSize Integer, Recognition Text (24))")
+            self.mmdb.Execute("CREATE TABLE tblNumberTypes (ID Integer, TypeName Text (50), [Value] Integer)")
+            
+            # Insert Identification defaults
+            self.mmdb.Execute("INSERT INTO tblIdentification VALUES (1,\"IPM\",\"\",\"09/24/03 00:00:00\",0,0,0,\"iDEN Phonebook Manager\")")
         
-        self.db.Execute("INSERT INTO tblNumberTypes VALUES (2,\"Private ID\",1)")
-        
-        self.db.Execute("INSERT INTO tblNumberTypes VALUES (3,\"Home\",2)")
-        
-        self.db.Execute("INSERT INTO tblNumberTypes VALUES (4,\"Work 1\",3)")
-        
-        self.db.Execute("INSERT INTO tblNumberTypes VALUES (5,\"Mobile\",4)")
-        
-        self.db.Execute("INSERT INTO tblNumberTypes VALUES (6,\"Fax\",5)")
-        
-        self.db.Execute("INSERT INTO tblNumberTypes VALUES (7,\"Pager\",6)")
-        
-        self.db.Execute("INSERT INTO tblNumberTypes VALUES (8,\"Talkgroup\",7)")
-        
-        self.db.Execute("INSERT INTO tblNumberTypes VALUES (9,\"Chat Address\",8)")
-        
-        self.db.Execute("INSERT INTO tblNumberTypes VALUES (10,\"Other\",9)")
-        
-        self.db.Execute("INSERT INTO tblNumberTypes VALUES (11,\"Email\",10)")
-        
-        self.db.Execute("INSERT INTO tblNumberTypes VALUES (12,\"Work 2\",11)")
-        
-        self.db.Execute("INSERT INTO tblNumberTypes VALUES (13,\"Private ID2\",13)")
-        
-        self.db.Execute("INSERT INTO tblNumberTypes VALUES (14,\"Email2\",14)")
-        
-        # Initialize tblContactList counters
-        self.ContactId = 1
-        self.RecordId = 1
-        
-    def AddContact(self,ContactName,Language="English",Home=None,Work1=None,Work2=None,Mobile=None,Email=None,Fax=None):
-        # We want to make sure that we wont increment the contacts counter
-        # by mistake (if someone called us with a name only...)
-        ContactAdded = False
-        
-        # Set language number according to input 
-        LanguageCode = 0
-        if Language == "Hebrew":
-            LanguageCode = 3
-        
+            # Insert Number types data
+            self.mmdb.Execute("INSERT INTO tblNumberTypes VALUES (1,\"Main\",0)")       
+            self.mmdb.Execute("INSERT INTO tblNumberTypes VALUES (2,\"Private ID\",1)")       
+            self.mmdb.Execute("INSERT INTO tblNumberTypes VALUES (3,\"Home\",2)")
+            self.mmdb.Execute("INSERT INTO tblNumberTypes VALUES (4,\"Work 1\",3)")
+            self.mmdb.Execute("INSERT INTO tblNumberTypes VALUES (5,\"Mobile\",4)")
+            self.mmdb.Execute("INSERT INTO tblNumberTypes VALUES (6,\"Fax\",5)")
+            self.mmdb.Execute("INSERT INTO tblNumberTypes VALUES (7,\"Pager\",6)")
+            self.mmdb.Execute("INSERT INTO tblNumberTypes VALUES (8,\"Talkgroup\",7)")
+            self.mmdb.Execute("INSERT INTO tblNumberTypes VALUES (9,\"Chat Address\",8)")
+            self.mmdb.Execute("INSERT INTO tblNumberTypes VALUES (10,\"Other\",9)")
+            self.mmdb.Execute("INSERT INTO tblNumberTypes VALUES (11,\"Email\",10)")
+            self.mmdb.Execute("INSERT INTO tblNumberTypes VALUES (12,\"Work 2\",11)")
+            self.mmdb.Execute("INSERT INTO tblNumberTypes VALUES (13,\"Private ID2\",13)")
+            self.mmdb.Execute("INSERT INTO tblNumberTypes VALUES (14,\"Email2\",14)")
+            
+            # Initialize tblContactList counters
+            self.ContactId = 1
+            self.RecordId = 1
+        else:
+            # Get latest Record ID and Contact ID
+            recordset = self.mmdb.OpenRecordset('SELECT MAX([ID]), MAX(ContactID) FROM tblContactList')
+            res = recordset.GetRows()
+            
+            self.RecordId = res[0][0]
+            self.ContactId = res[1][0]
+            
+            # Increase Counters by 1 for correct count
+            # If no records present, set both to 1
+            if self.RecordId:
+                self.RecordId = self.RecordId + 1
+                self.ContactId = self.ContactId + 1
+            else:
+                self.RecordId = 1
+                self.ContactId = 1
+            
+    def _AddContactRecord(self,ContactName,PhoneText,PhoneType):
+            if is_ascii(ContactName):
+                LanguageCode = 0
+            else:     
+                LanguageCode = NON_ENG_LANGCODE
+            
+            self.mmdb.Execute("INSERT INTO tblContactList VALUES (%s,%s,\"%s\",%s,\"%s\",%s,%s,%s,%s,0,0,144,0,0,0,0,0,0,0,0,255,0,0)" % (self.RecordId,self.ContactId, ContactName, self.RecordId, PhoneText, PhoneType, LanguageCode, LanguageCode, len(PhoneText)))
+            self.RecordId = self.RecordId + 1
+            
+    def AddContact(self,contact):        
         # Now we add contact details according to the following scheme:
         # ID,ContactID,ContactName,SpeedDial,Number,NumberType,Language,NameLang,PhoneNumberLength,Reserved,TonNP,CapabilityID,ExtnRecID,VoiceTag,TStamp0,TStamp1,TStamp2,TStamp3,SyncStatus,TempID,RingerID,PictureID,ExtnRecIDMSB
+        if contact.Home: self._AddContactRecord(contact.Name,contact.Home,2)
+        if contact.Mobile: self._AddContactRecord(contact.Name,contact.Mobile,5)
+        if contact.Work1: self._AddContactRecord(contact.Name,contact.Work1,4)
+        if contact.Work2: self._AddContactRecord(contact.Name,contact.Work2,12)
+        if contact.Email: self._AddContactRecord(contact.Name,contact.Email,11)
+        if contact.Email2: self._AddContactRecord(contact.Name,contact.Email2,14)
+        if contact.Fax: self._AddContactRecord(contact.Name,contact.Fax,2)
         
-        if Home:
-            Home = filter(lambda x: x.isdigit(), Home)
-            self.db.Execute("INSERT INTO tblContactList VALUES (%s,%s,\"%s\",%s,\"%s\",2,%s,%s,%s,0,0,144,0,0,0,0,0,0,0,0,255,0,0)" % (self.RecordId,self.ContactId, ContactName, self.RecordId, Home, LanguageCode, LanguageCode, len(Home)))
-            ContactAdded = True
-            self.RecordId = self.RecordId + 1
+        self.ContactId = self.ContactId + 1
             
-        if Work1:
-            Work1 = filter(lambda x: x.isdigit(), Work1)
-            self.db.Execute("INSERT INTO tblContactList VALUES (%s,%s,\"%s\",%s,\"%s\",3,%s,%s,%s,0,0,144,0,0,0,0,0,0,0,0,255,0,0)" % (self.RecordId,self.ContactId, ContactName, self.RecordId, Work1, LanguageCode, LanguageCode, len(Work1)))
-            ContactAdded = True
-            self.RecordId = self.RecordId + 1
-            
-        if Work2:
-            Work2 = filter(lambda x: x.isdigit(), Work2)
-            self.db.Execute("INSERT INTO tblContactList VALUES (%s,%s,\"%s\",%s,\"%s\",11,%s,%s,%s,0,0,144,0,0,0,0,0,0,0,0,255,0,0)" % (self.RecordId,self.ContactId, ContactName, self.RecordId, Work2, LanguageCode, LanguageCode, len(Work2)))
-            ContactAdded = True
-            self.RecordId = self.RecordId + 1
-            
-        if Mobile:
-            Mobile = filter(lambda x: x.isdigit(), Mobile)
-            self.db.Execute("INSERT INTO tblContactList VALUES (%s,%s,\"%s\",%s,\"%s\",4,%s,%s,%s,0,0,144,0,0,0,0,0,0,0,0,255,0,0)" % (self.RecordId,self.ContactId, ContactName, self.RecordId, Mobile, LanguageCode, LanguageCode, len(Mobile)))
-            ContactAdded = True
-            self.RecordId = self.RecordId + 1
-            
-        if Email:
-            self.db.Execute("INSERT INTO tblContactList VALUES (%s,%s,\"%s\",%s,\"%s\",10,%s,%s,%s,0,0,144,0,0,0,0,0,0,0,0,255,0,0)" % (self.RecordId,self.ContactId, ContactName, self.RecordId, Email, LanguageCode, LanguageCode, len(Email)))
-            ContactAdded = True
-            self.RecordId = self.RecordId + 1
-            
-        if Fax:
-            Fax = filter(lambda x: x.isdigit(), Fax)
-            self.db.Execute("INSERT INTO tblContactList VALUES (%s,%s,\"%s\",%s,\"%s\",5,%s,%s,%s,0,0,144,0,0,0,0,0,0,0,0,255,0,0)" % (self.RecordId,self.ContactId, ContactName, self.RecordId, Fax, LanguageCode, LanguageCode, len(Fax)))
-            ContactAdded = True
-            self.RecordId = self.RecordId + 1
-            
-        if ContactAdded:
-            # As explained earlier, if we indeed added the contact, we increment the counter.
-            self.ContactId = self.ContactId + 1
+    def AddContacts(self,contacts):
+        for contact in contacts: self.AddContact(contact)
                  
     def Close(self):
-        self.db.Close()
+        self.mmdb.Close()
