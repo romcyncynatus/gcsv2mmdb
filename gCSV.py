@@ -105,7 +105,7 @@ class gCSV:
                 Fax = contact["Home Fax"]
             
             try:
-                contacts.append(Contact(Name,Home,Work1,Work2,Mobile,Email,Email2,Fax))
+                contacts.append(Contact(Name,Home,Mobile,Work1,Work2,Email,Email2,Fax))
             except EmptyContactError:
                 # We just wont add empty contacts
                 pass

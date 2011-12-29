@@ -95,12 +95,12 @@ class mMDB:
         # Now we add contact details according to the following scheme:
         # ID,ContactID,ContactName,SpeedDial,Number,NumberType,Language,NameLang,PhoneNumberLength,Reserved,TonNP,CapabilityID,ExtnRecID,VoiceTag,TStamp0,TStamp1,TStamp2,TStamp3,SyncStatus,TempID,RingerID,PictureID,ExtnRecIDMSB
         if contact.Home: self._AddContactRecord(contact.Name,contact.Home,2)
-        if contact.Mobile: self._AddContactRecord(contact.Name,contact.Mobile,5)
-        if contact.Work1: self._AddContactRecord(contact.Name,contact.Work1,4)
-        if contact.Work2: self._AddContactRecord(contact.Name,contact.Work2,12)
-        if contact.Email: self._AddContactRecord(contact.Name,contact.Email,11)
+        if contact.Mobile: self._AddContactRecord(contact.Name,contact.Mobile,4)
+        if contact.Work1: self._AddContactRecord(contact.Name,contact.Work1,3)
+        if contact.Work2: self._AddContactRecord(contact.Name,contact.Work2,11)
+        if contact.Email: self._AddContactRecord(contact.Name,contact.Email,10)
         if contact.Email2: self._AddContactRecord(contact.Name,contact.Email2,14)
-        if contact.Fax: self._AddContactRecord(contact.Name,contact.Fax,2)
+        if contact.Fax: self._AddContactRecord(contact.Name,contact.Fax,5)
         
         self.ContactId = self.ContactId + 1
             
